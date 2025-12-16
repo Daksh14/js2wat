@@ -4,6 +4,7 @@ use clap::Parser;
 
 use crate::{lexer::lex, parser::parse};
 
+mod analysis;
 mod codegen;
 mod lexer;
 mod parser;

@@ -1,4 +1,5 @@
 use crate::{
+    analysis::dead_code_pass,
     lexer::Token,
     parser::{
         BinaryStmtBody, FuncCallStmt, FuncDeclBody, IfStmtBody, LetStmtBody, ReturnStmt, Stmt,
@@ -19,12 +20,13 @@ pub fn wat_gen(parsed: Vec<Stmt>) -> String {
                 return_value,
                 block,
             }) => {
-                let local_vars = local_var_wat(extract_local_variables(&block));
+                let dead_code_pass = dead_code_pass(&block, return_value.as_ref());
+                let local_vars = local_var_wat(extract_local_variables(&dead_code_pass));
                 let args = argument_var_wat(arguments);
 
                 let mut is_in_else_stmt = 0;
 
-                let fn_body = block_wat(block, &mut is_in_else_stmt);
+                let fn_body = block_wat(dead_code_pass, &mut is_in_else_stmt);
 
                 let (rt_val, rt_type) = if let Some(x) = return_value {
                     (return_val_wat(x, &mut is_in_else_stmt), "(result i32)")

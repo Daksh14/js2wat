@@ -2,7 +2,7 @@ use std::iter::Peekable;
 
 use crate::lexer::Token;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(clippy::enum_variant_names)]
 pub enum Stmt {
     FuncDecl(FuncDeclBody),
@@ -14,38 +14,38 @@ pub enum Stmt {
     FuncCall(FuncCallStmt),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ReturnStmt {
     BinaryStmtBody(BinaryStmtBody),
     FuncCallStmt(FuncCallStmt),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FuncCallStmt {
     pub function_name: String,
     pub arguments: Vec<Stmt>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfStmtBody {
     pub condition: BinaryStmtBody,
     pub if_block: Vec<Stmt>,
     pub if_block_rt_val: Option<ReturnStmt>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LetStmtBody {
     pub var_name: String,
     pub value: BinaryStmtBody,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WhileStmtBody {
     pub condition: BinaryStmtBody,
     pub block: Vec<Stmt>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FuncDeclBody {
     pub func_name: String,
     pub arguments: Vec<Stmt>,
@@ -53,7 +53,7 @@ pub struct FuncDeclBody {
     pub block: Vec<Stmt>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BinaryStmtBody {
     pub lhs: String,
     pub rhs: Option<String>,
@@ -211,10 +211,7 @@ fn parse_block<'a, I: Iterator<Item = &'a Token>>(
 
                         assert_token(peekable, &Token::SemiColon);
                     }
-                    _ => {
-                        println!("{:?}", x);
-                        println!("{:?}", peekable.peek())
-                    } // _ => panic!("Unexpected token"),
+                    _ => panic!("Unexpected token"),
                 }
             }
             Token::If => {

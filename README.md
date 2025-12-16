@@ -39,6 +39,19 @@ function gcd(a, b) {
 }
 ```
 
+## Bonus: Basic dead code folding inside top level scope in functions
+
+```
+cargo r -- --path=programs/dead_code.js
+
+cat output.wat 
+```
+
+The dead code elimination pass is very basic, it keep tracks of usages of variables
+but doesn't make a dependency graph, for complete dead code elimintaion a dependency graph
+implementation is needed, this is a fast approach to dead code elimination that I did using a simple
+pass and symbol table.
+
 ## Limitations
 
 If I had more time I will try to implement these features
@@ -47,7 +60,9 @@ If I had more time I will try to implement these features
 2. Does not support complex return values like `n + 2 + 3`
 3. All functions only return i32
 4. No in-depth intermediate analysis for optimizations like tail call, provenance, etc.
-5. Parser is a bit janky and can break on edge cases
+5. No symbol call table to detect wrong variable names or function calls (should be easy to implement)
+6. Dead code elimination with dependency inclusion
+6. Parser is a bit janky and can break on edge cases
 
 ## Testing
 
@@ -55,6 +70,6 @@ There are unit tests for the lexer in the lexer module, and parser and codegen m
 
 No integration tests yet.
 
-NOTE: Ideally we can import wasmtime as a dev dependency and run the generated code and directly check the output of programs in the integration tests!
+**NOTE: Ideally we can import wasmtime as a dev dependency and run the generated code and directly check the output of programs in the integration tests!**
 
 
