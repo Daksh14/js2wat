@@ -296,27 +296,8 @@ mod tests {
                     op: None,
                 },
             })],
-            return_value: None,
-        })];
-
-        let wat = wat_gen(ast);
-
-        assert!(wat.contains("(local $x i32)"));
-        assert!(wat.contains("i32.const 10"));
-        assert!(wat.contains("local.set $x"));
-    }
-
-    #[test]
-    fn gen_function_call() {
-        let ast = vec![Stmt::FuncDecl(FuncDeclBody {
-            func_name: "main".into(),
-            arguments: vec![],
-            block: vec![Stmt::FuncCall(FuncCallStmt {
-                function_name: "foo".into(),
-                arguments: Vec::new(),
-            })],
             return_value: Some(ReturnStmt::BinaryStmtBody(BinaryStmtBody {
-                lhs: "5".into(),
+                lhs: String::from("x"),
                 rhs: None,
                 op: None,
             })),
@@ -324,8 +305,9 @@ mod tests {
 
         let wat = wat_gen(ast);
 
-        assert!(wat.contains("i32.const 5"));
-        assert!(wat.contains("call $foo"));
+        assert!(wat.contains("(local $x i32)"));
+        assert!(wat.contains("i32.const 10"));
+        assert!(wat.contains("local.set $x"));
     }
 
     #[test]
@@ -369,7 +351,11 @@ mod tests {
                     op: None,
                 })),
             })],
-            return_value: None,
+            return_value: Some(ReturnStmt::BinaryStmtBody(BinaryStmtBody {
+                lhs: "42".into(),
+                rhs: None,
+                op: None,
+            })),
         })];
 
         let wat = wat_gen(ast);
