@@ -418,3 +418,204 @@ fn assert_token<'a, I: Iterator<Item = &'a Token>>(peekable: &mut Peekable<I>, t
         panic!("Expected token found None");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::Token;
+
+    fn t(s: &str) -> Token {
+        Token::Literal(s.to_string())
+    }
+
+    #[test]
+    fn parses_empty_input() {
+        let ast = parse(vec![]);
+        assert!(ast.is_empty());
+    }
+
+    #[test]
+    fn parses_function_declaration_no_body() {
+        let tokens = vec![
+            Token::Function,
+            Token::WhiteSpace,
+            t("foo"),
+            Token::ParenOpen,
+            Token::ParenClose,
+            Token::CurlyOpen,
+            Token::CurlyClose,
+        ];
+
+        let ast = parse(tokens);
+
+        assert_eq!(ast.len(), 1);
+
+        match &ast[0] {
+            Stmt::FuncDecl(body) => {
+                assert_eq!(body.func_name, "foo");
+                assert!(body.arguments.is_empty());
+                assert!(body.block.is_empty());
+                assert!(body.return_value.is_none());
+            }
+            _ => panic!("Expected FuncDecl"),
+        }
+    }
+
+    #[test]
+    fn parses_function_with_let_and_return() {
+        let tokens = vec![
+            Token::Function,
+            Token::WhiteSpace,
+            t("f"),
+            Token::ParenOpen,
+            Token::ParenClose,
+            Token::CurlyOpen,
+            Token::Let,
+            Token::WhiteSpace,
+            t("x"),
+            Token::WhiteSpace,
+            Token::Eq,
+            Token::WhiteSpace,
+            t("1"),
+            Token::SemiColon,
+            Token::Return,
+            Token::WhiteSpace,
+            t("x"),
+            Token::SemiColon,
+            Token::CurlyClose,
+        ];
+
+        let ast = parse(tokens);
+
+        match &ast[0] {
+            Stmt::FuncDecl(body) => {
+                assert_eq!(body.block.len(), 1);
+
+                match &body.block[0] {
+                    Stmt::LetStmt(let_stmt) => {
+                        assert_eq!(let_stmt.var_name, "x");
+                        assert_eq!(let_stmt.value.lhs, "1");
+                    }
+                    _ => panic!("Expected LetStmt"),
+                }
+
+                match &body.return_value {
+                    Some(ReturnStmt::BinaryStmtBody(bin)) => {
+                        assert_eq!(bin.lhs, "x");
+                        assert!(bin.op.is_none());
+                    }
+                    _ => panic!("Expected return binary stmt"),
+                }
+            }
+            _ => panic!("Expected FuncDecl"),
+        }
+    }
+
+    #[test]
+    fn parses_function_call_statement() {
+        let tokens = vec![
+            t("foo"),
+            Token::ParenOpen,
+            t("x"),
+            Token::Comma,
+            t("y"),
+            Token::ParenClose,
+            Token::SemiColon,
+        ];
+
+        let ast = parse(tokens);
+
+        assert_eq!(ast.len(), 1);
+
+        match &ast[0] {
+            Stmt::FuncCall(call) => {
+                assert_eq!(call.function_name, "foo");
+                assert_eq!(call.arguments.len(), 2);
+            }
+            _ => panic!("Expected FuncCall"),
+        }
+    }
+
+    #[test]
+    fn parses_while_loop_with_assignment() {
+        let tokens = vec![
+            Token::While,
+            Token::WhiteSpace,
+            Token::ParenOpen,
+            t("x"),
+            Token::LessThan,
+            t("10"),
+            Token::ParenClose,
+            Token::CurlyOpen,
+            t("x"),
+            Token::WhiteSpace,
+            Token::Eq,
+            Token::WhiteSpace,
+            t("x"),
+            Token::Sub,
+            t("1"),
+            Token::SemiColon,
+            Token::CurlyClose,
+        ];
+
+        let mut it = tokens.iter().peekable();
+        let (block, _) = parse_block(&mut it);
+
+        assert_eq!(block.len(), 1);
+
+        match &block[0] {
+            Stmt::WhileStmt(while_stmt) => {
+                assert_eq!(while_stmt.condition.lhs, "x");
+                assert_eq!(while_stmt.condition.rhs.as_deref(), Some("10"));
+                assert_eq!(while_stmt.block.len(), 1);
+            }
+            _ => panic!("Expected WhileStmt"),
+        }
+    }
+
+    #[test]
+    fn parses_if_statement() {
+        let tokens = vec![
+            Token::If,
+            Token::WhiteSpace,
+            Token::ParenOpen,
+            t("x"),
+            Token::DoubleEq,
+            t("0"),
+            Token::ParenClose,
+            Token::CurlyOpen,
+            Token::Return,
+            Token::WhiteSpace,
+            t("x"),
+            Token::SemiColon,
+            Token::CurlyClose,
+        ];
+
+        let mut it = tokens.iter().peekable();
+        let (block, _) = parse_block(&mut it);
+
+        assert_eq!(block.len(), 1);
+
+        match &block[0] {
+            Stmt::IfStmt(if_stmt) => {
+                assert_eq!(if_stmt.condition.lhs, "x");
+                assert_eq!(if_stmt.condition.rhs.as_deref(), Some("0"));
+                assert!(if_stmt.if_block.is_empty());
+                assert!(if_stmt.if_block_rt_val.is_some());
+            }
+            _ => panic!("Expected IfStmt"),
+        }
+    }
+
+    #[test]
+    fn parses_binary_expression() {
+        let tokens = [t("a"), Token::Add, t("b")];
+
+        let mut it = tokens.iter().peekable();
+        let expr = parse_binary_stmt(&mut it, None);
+
+        assert_eq!(expr.lhs, "a");
+        assert_eq!(expr.rhs.as_deref(), Some("b"));
+        assert_eq!(expr.op, Some(Token::Add));
+    }
+}

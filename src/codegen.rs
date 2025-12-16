@@ -12,32 +12,43 @@ pub fn wat_gen(parsed: Vec<Stmt>) -> String {
     wat.push_str("(module\n");
 
     for stmt in parsed {
-        if let Stmt::FuncDecl(FuncDeclBody {
-            func_name,
-            arguments,
-            return_value,
-            block,
-        }) = stmt
-        {
-            let local_vars = local_var_wat(extract_local_variables(&block));
-            let args = argument_var_wat(arguments);
+        match stmt {
+            Stmt::FuncDecl(FuncDeclBody {
+                func_name,
+                arguments,
+                return_value,
+                block,
+            }) => {
+                let local_vars = local_var_wat(extract_local_variables(&block));
+                let args = argument_var_wat(arguments);
 
-            let mut is_in_else_stmt = 0;
+                let mut is_in_else_stmt = 0;
 
-            let fn_body = block_wat(block, &mut is_in_else_stmt);
+                let fn_body = block_wat(block, &mut is_in_else_stmt);
 
-            let (rt_val, rt_type) = if let Some(x) = return_value {
-                (return_val_wat(x, &mut is_in_else_stmt), "(result i32)")
-            } else {
-                (String::new(), "")
-            };
+                let (rt_val, rt_type) = if let Some(x) = return_value {
+                    (return_val_wat(x, &mut is_in_else_stmt), "(result i32)")
+                } else {
+                    (String::new(), "")
+                };
 
-            let wat_template = format!(
-                "(func ${} {} {} {}\n {}\n{})\n(export \"{}\" (func ${}))\n",
-                func_name, args, rt_type, local_vars, fn_body, rt_val, func_name, func_name,
-            );
+                let wat_template = format!(
+                    "(func ${} {} {} {}\n {}\n{})\n(export \"{}\" (func ${}))\n",
+                    func_name, args, rt_type, local_vars, fn_body, rt_val, func_name, func_name,
+                );
 
-            wat.push_str(&wat_template);
+                wat.push_str(&wat_template);
+            }
+            Stmt::FuncCall(call_stmt) => {
+                wat.push_str(
+                    format!(
+                        "(func $_start (result i32)\n{})\n(export \"_start\" (func $_start))",
+                        func_call_wat(call_stmt)
+                    )
+                    .as_str(),
+                );
+            }
+            _ => break,
         }
     }
 
@@ -218,5 +229,152 @@ fn op_wat(token: Token) -> &'static str {
         Token::Percent => "i32.rem_u\n",
         Token::NotEq => "i32.ne\n",
         _ => "",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::Token;
+    use crate::parser::{
+        BinaryStmtBody, FuncCallStmt, FuncDeclBody, IfStmtBody, LetStmtBody, ReturnStmt, Stmt,
+        WhileStmtBody,
+    };
+
+    #[test]
+    fn gen_simple_return_function() {
+        let ast = vec![Stmt::FuncDecl(FuncDeclBody {
+            func_name: "main".into(),
+            arguments: vec![],
+            block: vec![],
+            return_value: Some(ReturnStmt::BinaryStmtBody(BinaryStmtBody {
+                lhs: "1".into(),
+                rhs: None,
+                op: None,
+            })),
+        })];
+
+        let wat = wat_gen(ast);
+
+        assert!(wat.contains("(func $main"));
+        assert!(wat.contains("i32.const 1"));
+        assert!(wat.contains("(export \"main\""));
+    }
+
+    #[test]
+    fn gen_binary_addition() {
+        let ast = vec![Stmt::FuncDecl(FuncDeclBody {
+            func_name: "add".into(),
+            arguments: vec![],
+            block: vec![],
+            return_value: Some(ReturnStmt::BinaryStmtBody(BinaryStmtBody {
+                lhs: "1".into(),
+                rhs: Some("2".into()),
+                op: Some(Token::Add),
+            })),
+        })];
+
+        let wat = wat_gen(ast);
+
+        assert!(wat.contains("i32.const 1"));
+        assert!(wat.contains("i32.const 2"));
+        assert!(wat.contains("i32.add"));
+    }
+
+    #[test]
+    fn gen_local_variable_assignment() {
+        let ast = vec![Stmt::FuncDecl(FuncDeclBody {
+            func_name: "main".into(),
+            arguments: vec![],
+            block: vec![Stmt::LetStmt(LetStmtBody {
+                var_name: "x".into(),
+                value: BinaryStmtBody {
+                    lhs: "10".into(),
+                    rhs: None,
+                    op: None,
+                },
+            })],
+            return_value: None,
+        })];
+
+        let wat = wat_gen(ast);
+
+        assert!(wat.contains("(local $x i32)"));
+        assert!(wat.contains("i32.const 10"));
+        assert!(wat.contains("local.set $x"));
+    }
+
+    #[test]
+    fn gen_function_call() {
+        let ast = vec![Stmt::FuncDecl(FuncDeclBody {
+            func_name: "main".into(),
+            arguments: vec![],
+            block: vec![Stmt::FuncCall(FuncCallStmt {
+                function_name: "foo".into(),
+                arguments: Vec::new(),
+            })],
+            return_value: Some(ReturnStmt::BinaryStmtBody(BinaryStmtBody {
+                lhs: "5".into(),
+                rhs: None,
+                op: None,
+            })),
+        })];
+
+        let wat = wat_gen(ast);
+
+        assert!(wat.contains("i32.const 5"));
+        assert!(wat.contains("call $foo"));
+    }
+
+    #[test]
+    fn gen_while_loop() {
+        let ast = vec![Stmt::FuncDecl(FuncDeclBody {
+            func_name: "loop_fn".into(),
+            arguments: vec![],
+            block: vec![Stmt::WhileStmt(WhileStmtBody {
+                condition: BinaryStmtBody {
+                    lhs: "x".into(),
+                    rhs: Some("10".into()),
+                    op: Some(Token::LessThan),
+                },
+                block: vec![],
+            })],
+            return_value: None,
+        })];
+
+        let wat = wat_gen(ast);
+
+        assert!(wat.contains("loop"));
+        assert!(wat.contains("i32.gt_u"));
+        assert!(wat.contains("br_if 0"));
+    }
+
+    #[test]
+    fn gen_if_statement_with_return() {
+        let ast = vec![Stmt::FuncDecl(FuncDeclBody {
+            func_name: "cond".into(),
+            arguments: vec![],
+            block: vec![Stmt::IfStmt(IfStmtBody {
+                condition: BinaryStmtBody {
+                    lhs: "1".into(),
+                    rhs: Some("1".into()),
+                    op: Some(Token::DoubleEq),
+                },
+                if_block: vec![],
+                if_block_rt_val: Some(ReturnStmt::BinaryStmtBody(BinaryStmtBody {
+                    lhs: "42".into(),
+                    rhs: None,
+                    op: None,
+                })),
+            })],
+            return_value: None,
+        })];
+
+        let wat = wat_gen(ast);
+
+        assert!(wat.contains("if (result i32)"));
+        assert!(wat.contains("i32.eq"));
+        assert!(wat.contains("i32.const 42"));
+        assert!(wat.contains("end"));
     }
 }
