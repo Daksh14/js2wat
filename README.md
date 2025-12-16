@@ -5,7 +5,7 @@ https://webassembly.github.io/spec/core/text/index.html
 
 ## Dependecies
 
-This project only uses `clap` for command line interface, other than that, there are 0 dependencies which a hand written lexer, parser and
+This project only uses `clap` for command line interface, other than that, there are 0 dependencies with a hand written lexer, parser and
 code generator
 
 ## Usage
@@ -24,6 +24,8 @@ or use the exported _start function
 
 ```
 wasmtime output.wat --invoke _start
+
+6
 ```
 
 ## Extra program
@@ -34,6 +36,7 @@ Try recursive_gcd.js
 function gcd(a, b) {
   if (b == 0) return a;
   return gcd(b, a % b);
+}
 ```
 
 ## Limitations
